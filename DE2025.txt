@@ -1,0 +1,185 @@
+ISP
+----------
+hostnamectl hostname ISP; exec bash
+cd /etc/net/ifaces/
+cp -r ens19/ ens20
+cd ens20
+vim options
+
+  BOOTPROTO=static
+  TYPE=eth
+  DISABLED=no
+  ONBOOT=yes
+  esc -> shift+z+z
+
+echo "172.16.4.1/28" >> ipv4address
+cd ..
+cp -r ens20/ ens21
+echo "172.16.5.1/28" > ens21/ipv4address
+systemctl restart network
+ip -c -br a
+vim /etc/net/sysctl.conf
+
+  net.ipv4.ip_forward = 1
+  esc -> shift+z+z
+
+sysctl -w net.ipv4.ip_forward=1
+apt-get update && apt-get install -y iptables
+iptables -A POSTROUTING -t nat -s 172.16.4.0/28 -o ens19 -j MASQUERADE
+iptables -A POSTROUTING -t nat -s 172.16.5.0/28 -o ens19 -j MASQUERADE
+iptables -t nat -L
+iptables-save > /etc/sysconfig/iptables
+systemctl enable --now iptables.service
+---------------------------------------------
+
+HQ-RTR
+---------
+admin:admin
+enable
+configure terminal
+hostname HQ-RTR
+do show port brief
+interface ISP
+ ip address 172.16.4.2/28
+ ip nat outside
+ exit
+port te2
+ service-instance siISP
+   encapsulation untagged
+   connect ip interface ISP
+   end
+show ip interface brief
+configure terminal
+ip route 0.0.0.0/0 172.16.4.1
+end
+write
+ping 1.1.1.1
+conf t
+ip nat pool HQ-POOL 192.168.100.1-192.168.100.62,192.168.200.1-192.168.200.14
+ip nat source dynamic inside-to-outside pool HQ-POOL overload interface ISP
+end
+write
+conf ter
+port te0
+  service-instance si100
+    encapsulation dot1q 100
+    rewrite pop 1
+    exit
+  exit
+interface SRV
+  ip address 192.168.100.1/26
+  ip nat inside
+  connect port te0 service-instance si100
+  end
+write
+conf ter
+port te1
+  service-instance si200
+    encapsulation dot1q 200
+    rewrite pop 1
+    exit
+  exit
+interface CLI
+  ip address 192.168.200.1/28
+  ip nat inside
+  connect port te1 service-instance si200
+  end
+write
+----------------------------
+
+HQ-SRV
+-------------
+hostnamectl hostname HQ-SRV; exec bash
+cd /etc/net/ifaces/
+vim ens19/options
+  
+  BOOTPROTO=static
+  TYPE=eth
+  DISABLED=no
+  ONBOOT=yes
+  esc -> shift+z+z
+
+cp -r ens19/ ens19.100
+cd ens19.100
+vim options
+
+  BOOTPROTO=static
+  TYPE=vlan
+  HOST=ens19
+  VID=100
+  ONBOOT=yes
+  esc -> shift+z+z
+
+cd ens19.100
+echo "192.168.100.62/26" > ipv4address
+echo "default via 192.168.100.1" > ipv4route
+systemctl restart network
+ping 1.1.1.1
+
+НЕОБЯЗАТЕЛЬНО: 
+   vim /etc/resolv.conf -> nameserver 77.88.8.88
+   vim /etc/apt/apt.conf -> Acquire::http::proxy "http://10.0.83.52:3128/";
+   apt-get update && apt-get install -y fonts-console-terminus
+   vim ~/.bashrc -> setfont ter-v28n
+---------------------
+
+HQ-CLI
+--------------
+hostnamectl hostname HQ-CLI; exec bash
+cd /etc/net/ifaces/
+vim ens19/options
+  
+  BOOTPROTO=static
+  TYPE=eth
+  DISABLED=no
+  NM_CONTROLLED=no
+  ONBOOT=yes
+  esc -> shift+z+z
+
+cp -r ens19/ ens19.200
+cd ens19.200
+vim options
+
+  BOOTPROTO=static
+  TYPE=vlan
+  HOST=ens19
+  VID=200
+  ONBOOT=yes
+  esc -> shift+z+z
+
+cd ens19.200
+echo "192.168.200.14/28" > ipv4address
+echo "default via 192.168.200.1" > ipv4route
+systemctl restart network
+ping 1.1.1.1
+--------------------------------------
+
+HQ-RTR
+---------------
+enable
+conf ter
+ip pool CLI-POOL 192.168.200.2-192.168.200.14
+dhcp-server 1
+  pool CLI-POOL 1
+    mask 255.255.255.240
+    gateway 192.168.200.1
+    dns 192.168.100.62
+    domain-name au-team.irpo
+    domain-search au-team.irpo
+    exit
+  exit
+interface CLI
+  dhcp-server 1
+  end
+write
+--------------------
+
+HQ-CLI
+---------
+su -
+cd /etc/net/ifaces/ens19.200
+rm -f ipv4address ipv4route
+vim options -> BOOTPROTO=dhcp -> esc -> shift+z+z
+systemctl restart network
+ip -c -br
+----------------------
