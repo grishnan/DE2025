@@ -183,3 +183,88 @@ vim options -> BOOTPROTO=dhcp -> esc -> shift+z+z
 systemctl restart network
 ip -c -br
 ----------------------
+
+BR-RTR
+-------------
+enable
+show port brief
+conf ter
+hostname BR-RTR
+interface ISP
+  ip address 172.16.5.2/28
+  exit
+port te0
+  service-instance siISP
+    encapsulation untagged
+    connect ip interface ISP
+    exit
+  exit
+interface BR-SRV
+  ip address 192.168.0.1/27
+  exit
+port te1
+  service-instance siBR-SRV
+    encapsulation untagged
+    connect ip interface BR-SRV
+    exit
+  exit
+ip route 0.0.0.0/0 172.16.5.1
+interface ISP
+  ip nat outside
+  exit
+interface BR-SRV
+  ip nat inside
+  exit
+ip nat pool BR-POOL 192.168.0.1-192.168.0.30
+ip nat source dynamic inside-to-outside pool BR-POOL overload interface ISP
+end
+ping 1.1.1.1
+write
+---------------
+
+BR-SRV
+------------
+hostnamectl hostname BR-SRV; exec bash
+cd /etc/net/ifaces/
+vim ens19/options
+  
+  BOOTPROTO=static
+  TYPE=eth
+  DISABLED=no
+  ONBOOT=yes
+  esc -> shift+z+z
+
+vim ens19/ipv4address -> 192.168.0.2/27 -> esc -> shift+z+z
+vim ens19/ipv4route -> default via 192.168.0.1 -> esc -> shift+z+z
+systemctl restart network
+ping 192.168.0.1
+--------------------
+
+HQ-RTR
+----------
+enable 
+conf ter
+interface tunnel.0
+  ip address 172.16.0.1/30
+  ip tunnel 172.16.4.2 172.16.5.2 mode gre
+  exit
+router OSPF 1
+  network 192.168.100.0/26 area 0
+  network 192.168.200.0/28 area 0
+  network 172.16.0.0/30 area 0
+  end
+write
+--------------
+BR-RTR
+----------
+enable 
+conf ter
+interface tunnel.0
+  ip address 172.16.0.2/30
+  ip tunnel 172.16.5.2 172.16.4.2 mode gre
+  exit
+router OSPF 1
+  network 192.168.0.0/27 area 0
+  network 172.16.0.0/30 area 0
+  end
+write
