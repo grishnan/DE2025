@@ -181,7 +181,7 @@ cd /etc/net/ifaces/ens19.200
 rm -f ipv4address ipv4route
 vim options -> BOOTPROTO=dhcp -> esc -> shift+z+z
 systemctl restart network
-ip -c -br
+ip -c -br a
 ----------------------
 
 BR-RTR
@@ -257,7 +257,7 @@ write
 --------------
 BR-RTR
 ----------
-enable 
+enable
 conf ter
 interface tunnel.0
   ip address 172.16.0.2/30
@@ -268,3 +268,74 @@ router OSPF 1
   network 172.16.0.0/30 area 0
   end
 write
+---------------
+HQ-SRV
+--------------
+apt-get update && apt-get install -y bind-utils bind
+systemctl status bind
+cd /etc/bind/
+vim options.conf
+  listen-on { 127.0.0.1; 192.168.100.62; };
+  forwarders { 77.88.8.88; };
+  allow-recursion { 127.0.0.1; 192.168.100.0/26; 192.168.200.0/28; 192.168.0.0/27; };
+  esc -> shift+z+z
+cd zone
+cp empty au-team.irpo.db
+chown root:named au-team.irpo.db
+vim au-team.irpo.db
+
+  $TTL	1D
+  @	IN	SOA	HQ-SRV.au-team.irpo.	root.au-team.irpo. (
+					2024092400	; serial
+					12H		; refresh
+					1H		; retry
+					1W		; expire
+					1H		; ncache )
+
+  	IN	NS	HQ-SRV.au-team.irpo.
+HQ-SRV	IN	A	192.168.100.62
+HQ-RTR	IN	A	192.168.100.1
+HQ-CLI	IN	A	192.168.200.2
+BR-SRV	IN	A	192.168.0.2
+BR-RTR	IN	A	192.168.0.1
+moodle	IN	CNAME	HQ-RTR
+wiki	IN	CNAME	HQ-RTR
+  esc -> shift+z+z
+
+cp 127.in-addr.arpa 168.192.in-addr.arpa.db
+chgrp named 168.192.in-addr.arpa.db
+vim 168.192.in-addr.arpa.db
+
+ $TTL	1D
+  @	IN	SOA	HQ-SRV.au-team.irpo.	root.au-team.irpo. (
+					2024092400	; serial
+					12H		; refresh
+					1H		; retry
+					1W		; expire
+					1H		; ncache )
+
+  	IN	NS	HQ-SRV.au-team.irpo.
+62.100	IN	PTR	HQ-SRV.au-team.irpo.
+1.100	IN	PTR	HQ-RTR.au-team.irpo.
+2.200	IN	PTR	HQ-CLI.au-team.irpo.
+  esc -> shift+z+z
+cd ..
+vim local.conf
+
+  zone "au-team.irpo" {
+    type master;
+    file "au-team.irpo.db";
+};
+
+  zone "168.192.in-addr.arpa" {
+    type master;
+    file "168.192.in-addr.arpa.db";
+};
+esc -> shift+z+z
+
+rndc-confgen > rndc.key
+комментируем секцию options полностью в rndc.key
+
+named-checkconf
+named-checkconf -z
+systemctl restart bind				
