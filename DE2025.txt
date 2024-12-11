@@ -24,6 +24,9 @@ vim /etc/net/sysctl.conf
   esc -> shift+z+z
 
 sysctl -w net.ipv4.ip_forward=1
+vim /etc/apt/apt.conf
+  Acquire::http::Proxy "http://10.0.83.52:3128/";
+  esc -> shift+z+z
 apt-get update && apt-get install -y iptables
 iptables -A POSTROUTING -t nat -s 172.16.4.0/28 -o ens19 -j MASQUERADE
 iptables -A POSTROUTING -t nat -s 172.16.5.0/28 -o ens19 -j MASQUERADE
@@ -110,7 +113,6 @@ vim options
   ONBOOT=yes
   esc -> shift+z+z
 
-cd ens19.100
 echo "192.168.100.62/26" > ipv4address
 echo "default via 192.168.100.1" > ipv4route
 systemctl restart network
@@ -147,7 +149,6 @@ vim options
   ONBOOT=yes
   esc -> shift+z+z
 
-cd ens19.200
 echo "192.168.200.14/28" > ipv4address
 echo "default via 192.168.200.1" > ipv4route
 systemctl restart network
@@ -238,6 +239,11 @@ vim ens19/ipv4address -> 192.168.0.2/27 -> esc -> shift+z+z
 vim ens19/ipv4route -> default via 192.168.0.1 -> esc -> shift+z+z
 systemctl restart network
 ping 192.168.0.1
+
+НЕОБЯЗАТЕЛЬНО: 
+   vim /etc/apt/apt.conf -> Acquire::http::proxy "http://10.0.83.52:3128/";
+   apt-get update && apt-get install -y fonts-console-terminus
+   vim ~/.bashrc -> setfont ter-v28n
 --------------------
 
 HQ-RTR
@@ -333,9 +339,10 @@ vim local.conf
 };
 esc -> shift+z+z
 
-rndc-confgen > rndc.key
-комментируем секцию options полностью в rndc.key
+rndc-confgen
+копируем алгоритм и ключ в rndc.key
 
 named-checkconf
 named-checkconf -z
-systemctl restart bind				
+systemctl restart bind	
+----------------------------------			
