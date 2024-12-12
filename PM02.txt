@@ -1,0 +1,113 @@
+BR-SRV (Преднастройка)
+-------------
+apt-get update && apt-get install -y bind bind-utils
+cd /etc/bind/
+vim options.conf
+
+acl internal {
+  192.168.100.0/26; 192.168.200.0/28; 192.168.0.0/27;
+};
+
+options {
+  ...
+  tkey-gssapi-keytab "/var/lib/samba/bind-dns/dns.keytab";
+  minimal-responses yes;
+
+  listen-on { 127.0.0.1; 192.168.0.2; };
+  forward first;
+  forwarders { 77.88.8.88; };
+  allow-recursion { 127.0.0.1; internal; };
+  allow-query { 127.0.0.1; internal; };
+  
+  logging {
+	category lame-servers {null; };
+  };
+
+  esc -> shift+z+z
+
+named-checkconf
+rndc-confgen >> rndc.key
+оставляем только:
+
+key "rndc-key" {
+	algorithm hmac-sha256;
+	secret "<ключ, который генерирует rndc-confgen>";
+};
+
+named-checkconf
+
+control bind-chroot disabled
+vim /etc/sysconfig/bind -> KRB5RCACHETYPE="none"
+vim /etc/bind/named.conf -> include "/var/lib/samba/bind-dns/named.conf";
+----------------------
+BR-SRV (Самостоятельно)
+------------------
+apt-get update
+apt-get install task-samba-dc
+systemctl disable --now bind
+
+rm -f /etc/samba/smb.conf
+rm -rf /var/lib/samba
+rm -rf /var/cache/samba
+mkdir -p /var/lib/samba/sysvol
+
+vim /etc/sysconfig/network -> HOSTNAME=BR-SRV.au-team.irpo -> esc + shift+z+z
+
+hostnamectl set-hostname BR-SRV.au-team.irpo
+domainname au-team.irpo
+
+vim /etc/resolvconf.conf -> name_servers='127.0.0.1'
+resolvconf -u
+cat /etc/resolv.conf
+
+control chrony server
+systemctl enable --now chronyd
+
+samba-tool domain provision
+  Realm [TEST.ALT]:
+  Domain [TEST]:
+  Server Role (dc, member, standalone) [dc]:
+  DNS backend (SAMBA_INTERNAL, BIND9_FLATFILE, BIND9_DLZ, NONE) [SAMBA_INTERNAL]: BIND9_DLZ
+  Administrator password: P@ssw0rd
+  Retype password: P@ssw0rd
+
+systemctl enable --now samba
+systemctl enable --now bind
+
+host -t A localhost 127.0.0.1
+host -t PTR 127.0.0.1 127.0.0.1
+
+vim /etc/krb5.conf
+ [libdefaults]
+   dns_lookup_realm = false
+   default_realm = AU-TEAM.IRPO
+   # default_ccache_name = KEYRING:persistent:%{uid}
+
+ [realms]
+   AU-TEAM.IRPO = {
+   default_domain = au-team.irpo
+ }
+
+ [domain_realm]
+   BR-SRV = AU-TEAM.IRPO
+
+esc -> shift+z+z
+
+# Проверки:
+samba-tool domain info 127.0.0.1
+smbclient -L localhost -U administrator # смотрим на стандартные шары
+cat /etc/resolv.conf # смотрим не поменялся ли 127.0.0.1
+host au-team.irpo
+host -t SRV _kerberos._udp.au-team.irpo.
+host -t SRV _ldap._tcp.au-team.irpo.
+host -t A BR-SRV.au-team.irpo.
+
+kinit administrator@AU-TEAM.IRPO # получаем TGS-билет
+klist # смотрим на билет
+----------------
+
+HQ-CLI
+-----------
+acc -> Дата и время -> NTP-сервер: BR-SRV.au-team.irpo
+chronyc sources
+ping BR-SRV
