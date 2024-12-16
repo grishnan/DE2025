@@ -108,6 +108,39 @@ klist # смотрим на билет
 
 HQ-CLI
 -----------
-acc -> Дата и время -> NTP-сервер: BR-SRV.au-team.irpo
+acc -> Дата и время -> Получать точное время с NTP-сервера: BR-SRV.au-team.irpo
 chronyc sources
 ping BR-SRV
+apt-get update && apt-get install task-auth-ad-sssd
+
+-----------
+HQ-SRV
+------------
+lsblk # проверяем наличие дисков
+fdisk /dev/sdb -> n -> p -> 1 -> enter -> enter -> t -> raid -> w
+fdisk /dev/sdc -> n -> p -> 1 -> enter -> enter -> t -> raid -> w
+fdisk /dev/sdd -> n -> p -> 1 -> enter -> enter -> t -> raid -> w
+lsblk # проверяем разделы
+rpm -qa mdadm # наличие mdadm
+mdadm --create /dev/md0 --level=5 --raid-devices=3 /dev/sdb1 /dev/sdc1 /dev/sdd1
+cat /proc/mdstat
+mkfs.ext4 /dev/md0
+blkid /dev/md0 >> /etc/fstab # обязательно ДВЕ СТРЕЛОЧКИ!
+mkdir /raid5
+vim /etc/fstab
+  UUID=...  /raid5  ext4  defaults  0  0
+  esc -> shift+z+z
+mount -a
+df -h
+cp /etc/mdadm.conf.sample /etc/mdadm.conf
+vim /etc/mdadm.conf
+  DEVICE /dev/md0
+  esc -> shift+z+z
+reboot
+apt-get install nfs-server nfs-utils -y
+vim /etc/exports
+  /raid5/nfs 192.168.200.0/28(rw,no_subtree_check,sync,insecure,all_squash)
+  esc -> shift+z+z
+exportfs -arv
+systemctl enable --now nfs-server.service
+----------------------
