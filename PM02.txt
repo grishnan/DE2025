@@ -133,14 +133,31 @@ vim /etc/fstab
 mount -a
 df -h
 cp /etc/mdadm.conf.sample /etc/mdadm.conf
+mdadm --detail --scan --verbose | awk '/ARRAY/ {print}' >> /etc/mdadm.conf
 vim /etc/mdadm.conf
-  DEVICE /dev/md0
+  MAILADDR root
+  PROGRAM /sbin/mdadm-syslog-events
+  ARRAY /dev/md/0 level=raid5 num-devices=3 metadata=1.2 name=HQ-SRV:0 UUID=...
+  DEVICE partitions
   esc -> shift+z+z
 reboot
 apt-get install nfs-server nfs-utils -y
 vim /etc/exports
-  /raid5/nfs 192.168.200.0/28(rw,no_subtree_check,sync,insecure,all_squash)
+  /raid5/nfs 192.168.200.0/28(rw,subtree_check,sync,secure,all_squash)
   esc -> shift+z+z
+mkdir /raid5/nfs
+chmod o+rwx /raid5/nfs
 exportfs -arv
 systemctl enable --now nfs-server.service
 ----------------------
+HQ-CLI
+--------------
+su -
+mount -t nfs 192.168.100.62:/raid5/nfs /mnt/nfs # проверяем 
+umount /mnt/nfs
+vim /etc/fstab
+  192.168.100.62:/raid5/nfs /mnt/nfs nfs defaults 0 0
+  esc -> shift+z+z
+mount -a
+df -h # проверяем, смонтировалось ли
+ls -ld /mnt/nfs # должно быть rwxrwxrwx
