@@ -112,7 +112,13 @@ acc -> Дата и время -> Получать точное время с NTP
 chronyc sources
 ping BR-SRV
 apt-get update && apt-get install task-auth-ad-sssd
-
+acc -> Аутентификация -> Домен Active Directory -> SSSD -> Домен: AU-TEAM.IRPO -> Применить -> Перезагрузка -> Войти заново в систему administrator@AU-TEAM.IRPO
+su -
+apt-get update
+apt-get install admc admx-basealt
+exit
+kinit administrator
+admc
 -----------
 HQ-SRV
 ------------
