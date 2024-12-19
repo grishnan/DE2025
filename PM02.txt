@@ -25,7 +25,7 @@ options {
 
   esc -> shift+z+z
 
-named-checkconf
+named-checkconf # должен выдать только ошибку с rndc-key, это нормально
 rndc-confgen >> rndc.key
 оставляем только:
 
@@ -34,7 +34,7 @@ key "rndc-key" {
 	secret "<ключ, который генерирует rndc-confgen>";
 };
 
-named-checkconf
+named-checkconf # должно быть без ошибок
 
 control bind-chroot disabled
 vim /etc/sysconfig/bind -> KRB5RCACHETYPE="none"
@@ -74,8 +74,8 @@ samba-tool domain provision
 systemctl enable --now samba
 systemctl enable --now bind
 
-host -t A localhost 127.0.0.1
-host -t PTR 127.0.0.1 127.0.0.1
+host -t A localhost 127.0.0.1 # проверяем A-запись для localhost
+host -t PTR 127.0.0.1 127.0.0.1 # проверяем PTR-запись для 127.0.0.1
 
 vim /etc/krb5.conf
  [libdefaults]
@@ -111,8 +111,7 @@ HQ-CLI
 acc -> Дата и время -> Получать точное время с NTP-сервера: BR-SRV.au-team.irpo
 chronyc sources
 ping BR-SRV
-apt-get update && apt-get install task-auth-ad-sssd
-acc -> Аутентификация -> Домен Active Directory -> SSSD -> Домен: AU-TEAM.IRPO -> Применить -> Перезагрузка -> Войти заново в систему administrator@AU-TEAM.IRPO
+acc -> Аутентификация -> Домен Active Directory -> SSSD -> Домен: au-team.irpo -> Применить -> Перезагрузка -> Войти заново в систему administrator@AU-TEAM.IRPO
 su -
 apt-get update
 apt-get install admc admx-basealt
@@ -137,7 +136,7 @@ vim /etc/fstab
   UUID=...  /raid5  ext4  defaults  0  0
   esc -> shift+z+z
 mount -a
-df -h
+df -h # Внимание! Смотрим примонтировалось ли
 cp /etc/mdadm.conf.sample /etc/mdadm.conf
 mdadm --detail --scan --verbose | awk '/ARRAY/ {print}' >> /etc/mdadm.conf
 vim /etc/mdadm.conf
@@ -155,15 +154,20 @@ mkdir /raid5/nfs
 chmod o+rwx /raid5/nfs
 exportfs -arv
 systemctl enable --now nfs-server.service
-----------------------
+--------------
 HQ-CLI
 --------------
+входим в систему как administrator@AU-TEAM.IRPO
 su -
+mkdir /mnt/nfs
 mount -t nfs 192.168.100.62:/raid5/nfs /mnt/nfs # проверяем 
 umount /mnt/nfs
 vim /etc/fstab
   192.168.100.62:/raid5/nfs /mnt/nfs nfs defaults 0 0
   esc -> shift+z+z
 mount -a
-df -h # проверяем, смонтировалось ли
+df -h # Внимание! Проверяем, смонтировалось ли
 ls -ld /mnt/nfs # должно быть rwxrwxrwx
+exit
+> /mnt/nfs/file # проверяем, создаёт ли файл
+admc
