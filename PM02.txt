@@ -167,7 +167,7 @@ vim /etc/fstab
   esc -> shift+z+z
 mount -a
 df -h # Внимание! Проверяем, смонтировалось ли
-ls -ld /mnt/nfs # должно быть rwxrwxrwx
+ls -ld /mnt/nfs # должно быть rwx для всех остальных пользователей
 exit
 > /mnt/nfs/file # проверяем, создаёт ли файл
 admc
